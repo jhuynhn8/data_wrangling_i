@@ -41,4 +41,25 @@ Sometimes skimming data is neat ?
 ```
 
 
+## Fix the missingness 
+
+```{r}
+  litters_df=
+    read_csv("data/FAS_litters.csv", na = c("NA",".",""))
+```
+
+
+##Try uploading the pups data set and skip to three becasue that's where the data is 
+
+```{r}
+  pups_df= 
+    read_csv(
+      "data/FAS_pups.csv", 
+      skip = 3,
+      na = c("NA",".","")
+      )
+
+pups_df= 
+  janitor::clean_names(pups_df)
+```
 
