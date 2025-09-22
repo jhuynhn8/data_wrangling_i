@@ -126,8 +126,80 @@ learning assessment for mutate: filter to only include pups with sex 1 and only 
  filter (pups_df, sex == 2, pd_walk <11)
 ```
 
+## `mutate` 
 
+use `mutate` to create or modify variables 
 
+```{r}
+ mutate(
+   litters_df,
+   wt_gain = gd18_weight - gd0_weight,
+   group = str_to_lower(group)
+   )
+```
 
+## `arrange`
+
+`arrange()` arranges things 
+
+```{r}
+ arrange(litters_df, pups_born_alive)
+ arrange (litters_df, group, pups_born_alive)
+ arrange(litters_df, desc(pups_born_alive))
+ 
+ arrange(litters_df, gd0_weight)
+```
+
+## PIPES 
+
+supposed we wanted to import, clean, select group, get rid of things with gd, get rid of anything missing variable, add weight gain variable 
+
+Let's see a bad to way to do things 
+
+```{r}
+litters_df = 
+  read_csv("data/FAS_litters.csv", na = c("NA", ".", ""))
+
+litters_df= 
+  janitor::clean_names(litters_df)
+
+litters_df2 = 
+  select(litters_df, group, litter_number, starts_with("gd"))
+
+litters_df3= 
+  drop_na(litters_df)
+
+litters_df4=
+  mutate(
+    litters_df,
+    wt_gain = gd18_weight - gd0_weight
+  )
+```
+
+Use pipes to avoid all of this (command shift m)
+I added the show_col_types / not in lecture becasue it wouldn't run the table 
+
+```{r}
+ litters_df= 
+  read_csv("data/FAS_litters.csv", na = c("NA", ".", ""), show_col_types = FALSE) |> 
+  janitor::clean_names() |> 
+  select(group, litter_number, starts_with("gd")) |> 
+  drop_na() |> 
+  mutate(
+    wt_gain = gd18_weight - gd0_weight)
+  litters_df
+```
+
+Learning assessment: load pups data, clean the variable names, filter the data to include only pups with sex 1, remove the pd ears variablle, create a new variable that indicates whether PD pivot is 7 or more days 
+
+```{r}
+pups_df = 
+    read_csv("./data/FAS_pups.csv", na = c("NA", "."), skip = 3) |>
+  janitor::clean_names() |> 
+  filter(sex == 1) |> 
+  select(-pd_ears) |> 
+  mutate(pd_pivot_gt7 = pd_pivot > 7)
+pups_df
+```
 
 
