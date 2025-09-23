@@ -1,0 +1,176 @@
+---
+title: "data_tidying"
+output: html_document
+date: "2025-09-23"
+---
+
+```{r setup, echo=FALSE, message=FALSE}
+ library(tidyverse)
+ library(readxl)
+ library(haven)
+```
+
+This document will show how to tidy data. 
+
+## Pivot longer 
+The pulse data is in the wide format right now and we will use pivot longer to make it the long format
+
+```{r}
+ pulse_df = 
+  read_sas("data/public_pulse_data.sas7bdat") |> 
+  janitor::clean_names() |> 
+  pivot_longer(
+    cols = bdi_score_bl:bdi_score_12m,
+    names_to = "visit",
+    values_to = "bdi_score",
+    names_prefix = "bdi_score_"
+  ) |> 
+  mutate(visit= replace(visit,visit == "bl", "00m"),) |> 
+  relocate(id,visit)
+pulse_df
+```
+
+Do one more example. 
+
+## Step-by-step explanation of the pipeline
+
+1. **Read the file and define what counts as missing.**  
+   `read_csv` loads `FAS_litters.csv` as a tibble. The argument `na = c("NA", ".", "")` tells R that the strings “NA”, a single dot, and empty cells should all be treated as missing values (`NA`).
+
+2. **Standardize the column names.**  
+   `janitor::clean_names()` converts all column names to snake_case (lowercase with underscores), removes spaces/symbols, and makes names consistent. For example, “Litter Number” becomes `litter_number`.
+
+3. **Keep only the columns you need.**  
+   `select(litter_number, ends_with("weight"))` retains the litter identifier plus every column whose name ends with “weight” (such as `gd0_weight` and `gd18_weight`).
+
+4. **Reshape from wide to long.**  
+   `pivot_longer(gd0_weight:gd18_weight, names_to = "gd", values_to = "weight")` stacks the weight columns into rows:
+   - `gd` stores the original column name (e.g., `gd0_weight`, `gd18_weight`).
+   - `weight` stores the numeric values.  
+   Result: instead of one row per litter with two weight columns, you now have one row per litter *per gestational day*.
+
+5. **Recode the gestational day label from text to numbers.**  
+   Inside `mutate`, `case_match` replaces the text in `gd` with numeric day values:
+   - `gd0_weight` → `0`
+   - `gd18_weight` → `18`
+
+6. **(Implicit) The pipe connects each step.**  
+   Each step flows into the next using the `|>` operator.
+
+---
+
+**End state:**  
+You now have a tidy table called `litters_wide` with three columns:  
+- `litter_number` (ID)  
+- `gd` (gestational day: 0 or 18)  
+- `weight` (weight measurement)  
+
+```{r}
+litters_wide = 
+  read_csv("./data/FAS_litters.csv",na = c("NA", ".", "")) |>
+  janitor::clean_names() |>
+  select(litter_number, ends_with("weight")) |> 
+  pivot_longer(
+    gd0_weight:gd18_weight,
+    names_to = "gd", 
+    values_to = "weight") |> 
+  mutate(
+    gd = case_match(
+      gd,
+      "gd0_weight"  ~ 0,
+      "gd18_weight" ~ 18
+    ))
+```
+
+## Pivot wiser 
+
+Let's make up an analysis result table. 
+
+```{r}
+ analysis_df = 
+  tibble(group = c("treatment","treatment","control", "control"),
+    time = c("pre","post","pre","post"),
+    mean = c(4,10,4,2.5))
+analysis_df
+```
+
+Pivot wider for human readability 
+
+```{r}
+ analysis_df |> 
+  pivot_wider(
+    names_from = time,
+    values_from = mean
+  ) |> 
+  knitr::kable()
+```
+
+## Bind tables 
+
+```{r}
+fellowship_ring = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "B3:D6") |>
+  mutate(movie = "fellowship_ring")
+
+two_towers = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "F3:H6") |>
+  mutate(movie = "two_towers")
+
+return_king = 
+  readxl::read_excel("./data/LotR_Words.xlsx", range = "J3:L6") |>
+  mutate(movie = "return_king")
+
+lotr_df = 
+  bind_rows(fellowship_ring, two_towers, return_king) |> 
+  janitor::clean_names() |> 
+  pivot_longer(
+    cols = female:male,
+    names_to = "sex",
+    values_to = "words"
+  ) |> 
+  relocate(movie) |> 
+  mutate(race = str_to_lower(race))
+
+lotr_df
+```
+
+## Join FAS datasets 
+
+Import `litters` dataset. 
+
+```{r}
+litters_df = 
+  read_csv("./data/FAS_litters.csv",na = c("NA", "", ".")) |>
+  janitor::clean_names() |>
+  mutate(wt_gain = gd18_weight - gd0_weight) |> 
+  separate(
+    group, into = c("dose","day_of_treatment"), sep = 3
+  )
+litters_df
+```
+
+Import `pups` next ! 
+
+```{r}
+ pups_df = 
+  read_csv("./data/FAS_pups.csv", na = c("NA", "", "."), skip=3) |> 
+  janitor::clean_names() |> 
+  mutate(
+    sex =case_match(
+    sex, 
+    1 ~ "male",
+    2 ~ "female"
+  ))
+pups_df
+```
+
+Join the datasets ! 
+
+```{r}
+fas_df = 
+  left_join(pups_df, litters_df, by = "litter_number") |> 
+  relocate(litter_number, dose, day_of_treatment)
+fas_df
+```
+
+
